@@ -1,34 +1,46 @@
+# core/brain.py
 from core.pesquisa import pesquisar_resumido
-from core.ai import gpt_local_responder
-import sys
-import time
+from core.ai import bode_responder
+import sys, time, os
 from colorama import Fore, Style, init
+import msvcrt
 
-# Inicializa colorama para cores no terminal
 init(autoreset=True)
 
-def imprimir_com_loading(gerar_resposta_func, *args, **kwargs):
-    """
-    Mostra uma animação de 'Jarvis está respondendo' enquanto a resposta é gerada.
-    """
-    loading = ["|", "/", "-", "\\"]  # animação de círculo girando
-    print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} ", end="")
+USUARIO_AUTORIZADO = os.getenv("JARVIS_USER", "bagre")
+SENHA_AUTORIZADA = os.getenv("JARVIS_PASS", "1234")
 
-    # Loop rápido do loading inicial
-    for i in range(10):
-        sys.stdout.write(loading[i % len(loading)])
-        sys.stdout.flush()
-        time.sleep(0.1)
-        sys.stdout.write("\b")
+# ------------------- Funções de autenticação -------------------
+def input_senha(prompt="Senha: "):
+    senha = ""
+    print(prompt, end="", flush=True)
+    while True:
+        ch = msvcrt.getch()
+        if ch in {b'\r', b'\n'}:
+            print()
+            break
+        elif ch == b'\x08':
+            if len(senha) > 0:
+                senha = senha[:-1]
+                print("\b \b", end="", flush=True)
+        else:
+            senha += ch.decode()
+            print("*", end="", flush=True)
+    return senha
 
-    # Gera a resposta real
-    resposta = gerar_resposta_func(*args, **kwargs)
+def autenticar_usuario():
+    print(f"{Fore.RED}=== AUTENTICAÇÃO JARVIS ==={Style.RESET_ALL}")
+    usuario = input("Usuário: ").strip()
+    senha = input_senha("Senha: ")
 
-    # Limpa o loading e mostra a resposta final
-    sys.stdout.write("\b")  # apaga o último caractere do loading
-    print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} {resposta}\n")
-    return resposta
+    if usuario == USUARIO_AUTORIZADO and senha == SENHA_AUTORIZADA:
+        print(f"{Fore.GREEN}Acesso autorizado!{Style.RESET_ALL}\n")
+        return True
+    else:
+        print(f"{Fore.RED}Acesso negado!{Style.RESET_ALL}")
+        return False
 
+# ------------------- Brain -------------------
 class JarvisBrain:
     def __init__(self, nome_usuario="Senhor"):
         self.nome_usuario = nome_usuario
@@ -38,7 +50,6 @@ class JarvisBrain:
             "listar funcoes": "Lista todas as funções disponíveis",
             "sair": "Desliga o JARVIS"
         }
-        self.conversa = []
 
     def listar_funcoes(self):
         print("Funções disponíveis:")
@@ -46,43 +57,41 @@ class JarvisBrain:
             print(f"- {key}: {desc}")
 
     def start(self):
-        print(f"Olá, {self.nome_usuario}. Eu sou o JARVIS.")
-        print("Sistema online e pronto.")
+        if not autenticar_usuario():
+            return
+
+        print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Olá, {self.nome_usuario}. Eu sou o JARVIS.")
+        print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Sistema online e pronto.\n")
 
         while True:
             comando = input("O que deseja fazer? ").strip()
 
             if comando.lower() == "sair":
-                print("JARVIS: Desligando o sistema. Até mais!")
+                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Desligando o sistema. Até mais!")
                 break
 
             elif comando.lower() == "status":
-                print("JARVIS: Todos os sistemas funcionando normalmente.")
+                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Todos os sistemas funcionando normalmente.")
 
             elif comando.lower() == "listar funcoes":
                 self.listar_funcoes()
 
+            elif "pesquisar" in comando.lower():
+                termo = comando.lower().replace("pesquisar", "").strip()
+                if termo == "":
+                    termo = input(f"{Fore.RED}JARVIS:{Style.RESET_ALL} O que deseja pesquisar? ").strip()
+
+                resultados = pesquisar_resumido(termo)
+                print(f"\n{Fore.RED}JARVIS:{Style.RESET_ALL} Aqui está o que encontrei sobre '{termo}':\n")
+                print(f"Resumo: {resultados['resumo']}\n")
+                print(f"Fonte principal: {resultados['fonte']}\n")
+                if resultados["outros_links"]:
+                    print("Outros links:")
+                    for link in resultados["outros_links"]:
+                        print(f"- {link}")
+                print()
             else:
-                # Se o comando for vazio
-                if comando.strip() == "":
-                    print("JARVIS: Não entendi, digite algo.")
-                    continue
-
-                # Verifica se é uma pesquisa
-                if "pesquisar" in comando.lower():
-                    termo = comando.lower().replace("pesquisar", "").strip()
-                    if termo == "":
-                        termo = input("JARVIS: O que deseja pesquisar? ").strip()
-
-                    resultados = pesquisar_resumido(termo)
-                    print(f"\nJARVIS: Aqui está o que encontrei sobre '{termo}':\n")
-                    print(f"Resumo: {resultados['resumo']}\n")
-                    print(f"Fonte principal: {resultados['fonte']}\n")
-                    if resultados["outros_links"]:
-                        print("Outros links:")
-                        for link in resultados["outros_links"]:
-                            print(f"- {link}")
-                    print()  # linha em branco
-                else:
-                    # Conversa normal com GPT local com loading animado
-                    imprimir_com_loading(gpt_local_responder, comando, self.conversa)
+                # Qualquer outro texto vai para a IA Bode
+                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Pensando...")
+                resposta = bode_responder(comando)
+                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} {resposta}\n")
