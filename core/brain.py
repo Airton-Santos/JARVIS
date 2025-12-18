@@ -1,97 +1,126 @@
 # core/brain.py
 from core.pesquisa import pesquisar_resumido
 from core.ai import bode_responder
-import sys, time, os
+from core.stt import capturar_voz
+from core.config_audio import ConfigAudio
+from core.auth import FenixAuth
+import sys, os, asyncio
 from colorama import Fore, Style, init
-import msvcrt
+import speech_recognition as sr
+import edge_tts
+import pygame
+import pyautogui 
 
 init(autoreset=True)
+pygame.mixer.init()
 
-USUARIO_AUTORIZADO = os.getenv("JARVIS_USER", "bagre")
-SENHA_AUTORIZADA = os.getenv("JARVIS_PASS", "1234")
+# ------------------- Funções de Voz -------------------
+async def falar_async(texto):
+    voice = "pt-BR-AntonioNeural"
+    output_file = "res.mp3"
+    communicate = edge_tts.Communicate(texto, voice)
+    await communicate.save(output_file)
+    pygame.mixer.music.load(output_file)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        await asyncio.sleep(0.01)
+    pygame.mixer.music.unload()
+    if os.path.exists(output_file):
+        try: os.remove(output_file)
+        except: pass
 
-# ------------------- Funções de autenticação -------------------
-def input_senha(prompt="Senha: "):
-    senha = ""
-    print(prompt, end="", flush=True)
-    while True:
-        ch = msvcrt.getch()
-        if ch in {b'\r', b'\n'}:
-            print()
-            break
-        elif ch == b'\x08':
-            if len(senha) > 0:
-                senha = senha[:-1]
-                print("\b \b", end="", flush=True)
-        else:
-            senha += ch.decode()
-            print("*", end="", flush=True)
-    return senha
+def falar(texto):
+    asyncio.run(falar_async(texto))
 
-def autenticar_usuario():
-    print(f"{Fore.RED}=== AUTENTICAÇÃO JARVIS ==={Style.RESET_ALL}")
-    usuario = input("Usuário: ").strip()
-    senha = input_senha("Senha: ")
-
-    if usuario == USUARIO_AUTORIZADO and senha == SENHA_AUTORIZADA:
-        print(f"{Fore.GREEN}Acesso autorizado!{Style.RESET_ALL}\n")
-        return True
-    else:
-        print(f"{Fore.RED}Acesso negado!{Style.RESET_ALL}")
-        return False
-
-# ------------------- Brain -------------------
-class JarvisBrain:
+# ------------------- Brain (Fênix) -------------------
+class FenixBrain:
     def __init__(self, nome_usuario="Senhor"):
+        self.nome_ia = "Fênix"
+        self.nome_projeto = "FENIX"
         self.nome_usuario = nome_usuario
-        self.funcoes = {
-            "pesquisar": "Pesquisa algo e retorna resumo + links",
-            "status": "Mostra status do sistema",
-            "listar funcoes": "Lista todas as funções disponíveis",
-            "sair": "Desliga o JARVIS"
-        }
-
-    def listar_funcoes(self):
-        print("Funções disponíveis:")
-        for key, desc in self.funcoes.items():
-            print(f"- {key}: {desc}")
+        
+        self.cfg = ConfigAudio()
+        self.auth = FenixAuth()
+        
+        self.reconhecedor = sr.Recognizer()
+        self.reconhecedor = self.cfg.configurar_reconhecedor(self.reconhecedor)
 
     def start(self):
-        if not autenticar_usuario():
+        if not self.auth.autenticar():
             return
 
-        print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Olá, {self.nome_usuario}. Eu sou o JARVIS.")
-        print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Sistema online e pronto.\n")
+        with sr.Microphone() as source:
+            print(f"{Fore.YELLOW}Calibrando sensores acústicos...{Style.RESET_ALL}")
+            self.reconhecedor.adjust_for_ambient_noise(source, duration=2)
+
+        print(f"{Fore.RED}{self.nome_ia}:{Style.RESET_ALL} Standby Ativo.")
+        falar(f"Núcleo {self.nome_projeto} online. Aguardando ativação.")
 
         while True:
-            comando = input("O que deseja fazer? ").strip()
+            # 1. MODO STANDBY
+            print(f"{Fore.CYAN}Aguardando ativação...{Style.RESET_ALL}", end="\r", flush=True)
+            ativacao = capturar_voz(self.reconhecedor, timeout=None, phrase_limit=5)
+            
+            if ativacao and any(word.lower() in ativacao.lower() for word in self.cfg.WAKE_WORDS):
+                falar(f"Sim {self.nome_usuario}, sistemas de voz ativos.")
+                
+                # 2. MODO CONVERSA ATIVA
+                while True:
+                    print(f"{Fore.GREEN}>>> ESCUTANDO COMANDO ATIVO... <<<{Style.RESET_ALL}")
+                    comando = capturar_voz(self.reconhecedor, timeout=8, phrase_limit=10)
 
-            if comando.lower() == "sair":
-                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Desligando o sistema. Até mais!")
-                break
+                    if not comando: break
+                    comando = comando.lower()
 
-            elif comando.lower() == "status":
-                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Todos os sistemas funcionando normalmente.")
+                    print(f"{Fore.BLUE}[OUVIDO]: {comando}{Style.RESET_ALL}")
 
-            elif comando.lower() == "listar funcoes":
-                self.listar_funcoes()
+                    # --- GATILHOS DE SEGURANÇA ---
+                    if any(cmd in comando for cmd in self.cfg.CMD_DESLIGAR):
+                        falar("Desligando sistemas. Até logo.")
+                        sys.exit()
 
-            elif "pesquisar" in comando.lower():
-                termo = comando.lower().replace("pesquisar", "").strip()
-                if termo == "":
-                    termo = input(f"{Fore.RED}JARVIS:{Style.RESET_ALL} O que deseja pesquisar? ").strip()
+                    elif any(cmd in comando for cmd in self.cfg.CMD_DESATIVAR_VOZ):
+                        falar("Comando de voz suspenso. Em standby.")
+                        break
 
-                resultados = pesquisar_resumido(termo)
-                print(f"\n{Fore.RED}JARVIS:{Style.RESET_ALL} Aqui está o que encontrei sobre '{termo}':\n")
-                print(f"Resumo: {resultados['resumo']}\n")
-                print(f"Fonte principal: {resultados['fonte']}\n")
-                if resultados["outros_links"]:
-                    print("Outros links:")
-                    for link in resultados["outros_links"]:
-                        print(f"- {link}")
-                print()
-            else:
-                # Qualquer outro texto vai para a IA Bode
-                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} Pensando...")
-                resposta = bode_responder(comando)
-                print(f"{Fore.RED}JARVIS:{Style.RESET_ALL} {resposta}\n")
+                    # --- IDENTIDADE DO CRIADOR (AIRTON/BAGRE) ---
+                    elif any(q in comando for q in ["quem é você", "o que é você", "projeto fênix", "quem te criou", "seu desenvolvedor"]):
+                        info = (
+                            f"Eu sou o Fênix, Fluxo de Execução em Núcleo de Inteligência em X-Interface. "
+                            f"Fui desenvolvido pelo Senhor Airton, conhecido por seus amigos como Bagre. "
+                            f"Ele me criou em prol da automação e da evolução tecnológica."
+                        )
+                        falar(info)
+
+                    # --- FUNÇÃO DE ESCRITA (DITADO) ---
+                    elif any(cmd in comando for cmd in self.cfg.CMD_ATIVAR_ESCRITA):
+                        falar("Modo de escrita habilitado. Diga seu texto.")
+                        print(f"{Fore.MAGENTA}>>> MODO ESCRITA ATIVO: DIGITANDO... <<<{Style.RESET_ALL}")
+                        
+                        while True:
+                            ditado = capturar_voz(self.reconhecedor, timeout=None, phrase_limit=15)
+                            if not ditado: continue
+                            
+                            processado = ditado.lower().strip()
+
+                            # VERIFICAÇÃO DE SAÍDA: Bloqueia a digitação se o comando for de desativar
+                            if "desativar escrita" in processado or "encerrar escrita" in processado or "parar escrita" in processado:
+                                falar("Protocolo de escrita encerrado. Voltando aos comandos.")
+                                print(f"{Fore.CYAN}>>> MODO COMANDO REATIVADO <<<{Style.RESET_ALL}")
+                                break
+                            
+                            # Digita o texto apenas se não for o comando de saída
+                            pyautogui.write(ditado + " ", interval=0.01)
+                            print(f"{Fore.YELLOW}Escrito:{Style.RESET_ALL} {ditado}")
+
+                    # --- LÓGICA DE PESQUISA ---
+                    elif "pesquisar" in comando:
+                        termo = comando.replace("pesquisar", "").strip()
+                        if termo:
+                            res = pesquisar_resumido(termo)
+                            falar(res['resumo'])
+                    
+                    # --- RESPOSTA DA IA ---
+                    else:
+                        resposta = bode_responder(comando)
+                        falar(resposta)

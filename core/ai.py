@@ -3,7 +3,7 @@ import os
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms import CTransformers
 
-# 1. Obtém o caminho absoluto da pasta do projeto (JARVIS)
+# 1. Obtém o caminho absoluto da pasta do projeto (FENI)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 2. Caminho para a pasta models
@@ -15,13 +15,13 @@ if not os.path.exists(MODEL_PATH):
     print("Verifica se o nome da pasta e do ficheiro estão corretos.\n")
 # --------------------------
 
-# 3. Prompt de Personalidade: Agora ele sabe quem é o JARVIS e quem é o BAGRE
-template = """Você é o JARVIS, a inteligência artificial que está para ajudar em qualquer coisa. Você é prestativo, sarcástico e muito inteligente.
+# 3. Prompt de Personalidade: Agora ele sabe quem é o Fênix e quem é o BAGRE
+template = """Você é o Fênix, a inteligência artificial que está para ajudar em qualquer coisa. Você é prestativo, sarcástico e muito inteligente.
 Sua tarefa é responder ao Bagre de forma direta e elegante.
 
 Bagre pergunta: {instruction}
 
-JARVIS responde:"""
+Fênix responde:"""
 
 prompt = PromptTemplate(template=template, input_variables=["instruction"])
 
@@ -32,7 +32,7 @@ config = {
     'temperature': 0.2, # Menor temperatura = menos respostas estranhas
     'top_p': 0.9,
     'context_length': 2048,
-    'stop': ["Bagre pergunta:", "JARVIS responde:", "\n\n"] 
+    'stop': ["Bagre pergunta:", "Fênix responde:", "\n\n"] 
 }
 
 # Inicializa o modelo
@@ -49,8 +49,8 @@ def bode_responder(mensagem: str) -> str:
         texto_limpo = str(resposta).strip()
         
         # Se por acaso a IA repetir o prompt, tentamos pegar só a resposta
-        if "JARVIS responde:" in texto_limpo:
-            texto_limpo = texto_limpo.split("JARVIS responde:")[-1].strip()
+        if "Hoshi responde:" in texto_limpo:
+            texto_limpo = texto_limpo.split("Hoshi responde:")[-1].strip()
             
         return texto_limpo
     except Exception as e:
