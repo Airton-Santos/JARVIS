@@ -73,3 +73,23 @@ def analisar_conexoes():
     if processos_ativos:
         return "Programas conectados à rede: " + ", ".join(processos_ativos[:4])
     return "Nenhuma conexão externa ativa no momento."
+
+def ajustar_volume_app(nivel):
+    """
+    Ajusta o volume especificamente do processo do Projeto Fenix.
+    Nivel: 0.0 a 1.0
+    """
+    try:
+        sessions = AudioUtilities.GetAllSessions()
+        for session in sessions:
+            volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+            if session.Process and session.Process.name() == "python.exe": # Ou o nome do seu .exe
+                volume.SetMasterVolume(nivel, None)
+    except Exception as e:
+        print(f"Erro ao ajustar volume: {e}")
+
+def encerrar_projeto():
+    """Finaliza todos os protocolos e fecha o programa"""
+    # Aqui o senhor pode adicionar comandos para salvar logs antes de sair
+    print("Encerrando Projeto Fenix. Até logo, Senhor.")
+    os._exit(0) # Força o fechamento de todas as threads (inclusive a do microfone)

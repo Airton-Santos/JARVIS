@@ -29,14 +29,46 @@ def falar(texto):
     asyncio.run(falar_async(texto))
 
 class FenixBrain:
-    def __init__(self, interface=None, nome_usuario="Fenix"):
-        self.nome_ia = "Feni"
+    def __init__(self, interface=None, nome_usuario="Airton"):
+        self.nome_ia = "Fenix"
         self.nome_projeto = "FENIX"
         self.nome_usuario = nome_usuario
         self.interface = interface 
         self.cfg = ConfigAudio()
         self.reconhecedor = sr.Recognizer()
         self.reconhecedor = self.cfg.configurar_reconhecedor(self.reconhecedor)
+
+    def processar_comando_manual(self, comando):
+        """
+        MÉTODO DE CONEXÃO COM A INTERFACE (CARDS)
+        Recebe o clique dos botões e executa as funções do system.py
+        """
+        self.log(f"COMANDO MANUAL RECEBIDO: {comando}", Fore.CYAN)
+        
+        if comando == "processos":
+            falar("Analisando processos pesados.")
+            res = obter_processos_pesados()
+            self.log(res, Fore.GREEN)
+            falar(res)
+            
+        elif comando == "hardware":
+            falar("Verificando saúde do hardware.")
+            res = saude_hardware()
+            self.log(res, Fore.GREEN)
+            falar(res)
+            
+        elif comando == "limpeza":
+            falar("Iniciando limpeza de arquivos temporários.")
+            res = limpar_temporarios()
+            self.log(res, Fore.GREEN)
+            falar(res)
+            
+        elif comando == "rede":
+            falar("Analisando conexões de rede.")
+            from core.system import analisar_conexoes
+            res = analisar_conexoes()
+            self.log(res, Fore.GREEN)
+            falar(res)
 
     def log(self, mensagem, cor=Fore.WHITE):
         print(f"{cor}{mensagem}{Style.RESET_ALL}")
@@ -46,7 +78,7 @@ class FenixBrain:
     def executar_diagnostico(self):
         """Fluxo direto: Pergunta e executa o que o senhor leu na interface"""
         self.log("Aguardando instrução de diagnóstico...", Fore.YELLOW)
-        falar("O que o senhor deseja verificar no sistema?") # Pergunta curta e direta
+        falar("O que o senhor deseja verificar no sistema?") 
         
         escolha = capturar_voz(self.reconhecedor, timeout=7).lower()
         
@@ -92,7 +124,6 @@ class FenixBrain:
                     comando = comando.lower().strip()
                     self.log(f"[OUVIDO]: {comando}", Fore.BLUE)
 
-                    # --- INTERCEPTOR DE COMANDOS DE SISTEMA (Ação Direta) ---
                     if any(cmd in comando for cmd in self.cfg.CMD_DESLIGAR):
                         falar("Desativando núcleo neural. Até logo, Senhor.")
                         sys.exit()
@@ -104,7 +135,6 @@ class FenixBrain:
                     elif "verificar computador" in comando:
                         self.executar_diagnostico()
 
-                    # --- NÚCLEO DE INTELIGÊNCIA ARTIFICIAL ---
                     else:
                         resposta = bode_responder(comando)
                         self.log(f"Fênix: {resposta}", Fore.GREEN)

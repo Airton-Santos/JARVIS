@@ -1,31 +1,40 @@
 import os
+import sys
 import warnings
 import threading
-from core.interface import FenixUI
+from core.interface.main_ui import FenixUI
 from core.brain import FenixBrain
 
-# Silenciar avisos
+# Silenciar avisos e prompts desnecessários
 warnings.filterwarnings("ignore", category=UserWarning)
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
-def rodar_sistema(interface):
-    """Função que rodará o cérebro em uma thread separada"""
-    fenix = FenixBrain(interface=interface, nome_usuario="Airton")
+def rodar_sistema(fenix_instancia):
+    """Executa o loop principal do cérebro"""
     try:
-        fenix.start()
+        fenix_instancia.start()
     except Exception as e:
-        interface.log_msg(f"ERRO NO NÚCLEO: {e}")
+        print(f"Erro crítico no núcleo: {e}")
 
 if __name__ == "__main__":
-    # 1. Cria a Interface
-    app = FenixUI()
+    # 1. Instanciar o Cérebro primeiro (sem iniciar o loop ainda)
+    brain = FenixBrain(nome_usuario="Airton") 
+
+    # 2. Criar a Interface passando o callback do cérebro
+    # Isso permite que, ao clicar num botão, a UI avise o Brain
+    app = FenixUI(brain_callback=brain.processar_comando_manual)
     
-    # 2. Cria a Thread para o Cérebro não travar a UI
-    brain_thread = threading.Thread(target=rodar_sistema, args=(app,), daemon=True)
+    # 3. Vincular a interface ao cérebro para que o Brain consiga usar o app.log_msg
+    brain.interface = app
+
+    # 4. Configurar e disparar a Thread do Cérebro
+    # daemon=True garante que o cérebro morra se você fechar a janela
+    brain_thread = threading.Thread(target=rodar_sistema, args=(brain,), daemon=True)
     
-    # 3. No botão 'SISTEMA ON' da sua Interface, você pode chamar brain_thread.start()
-    # Ou iniciar automaticamente aqui:
+    # Opcional: Você pode iniciar aqui ou vincular ao botão "SISTEMA ON"
+    # Para teste imediato, vamos iniciar:
     brain_thread.start()
-    
-    # 4. Inicia a Interface (Loop Principal)
+
+    # 5. Inicia o loop da Interface (Bloqueante)
+    app.log_msg("Sistemas integrados. Núcleo Fenix Online.")
     app.mainloop()
