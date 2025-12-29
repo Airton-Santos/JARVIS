@@ -3,16 +3,12 @@ import speech_recognition as sr
 
 class ConfigAudio:
     def __init__(self):
-        self.ENERGY_THRESHOLD = 150      
-        self.PAUSE_THRESHOLD = 0.8      
-        self.DYNAMIC_ENERGY = True      
+        self.ENERGY_THRESHOLD = 80
+        self.PAUSE_THRESHOLD = 0.8
+        self.DYNAMIC_ENERGY = False
         
         # TUDO EM MINÚSCULO PARA EVITAR CONFLITO
-        self.WAKE_WORDS = [
-            "fênix ativar comando de voz", "ativar comando de voz fenix", 
-            "fênix iniciar comando de voz", "iniciar comando de voz", 
-            "olá fênix", "oi fênix", "ola fênix", "fenix"
-        ]
+        self.WAKE_WORDS = ["fênix", "fenix"]
         
         self.CMD_DESLIGAR = ["desligar projeto fênix", "desligar nucleo fênix", "fênix desligar sistema", "desligar fenix"]
         self.CMD_DESATIVAR_VOZ = ["desativar comando por voz", "suspender comando por voz", "pausar comando por voz"]

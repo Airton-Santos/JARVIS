@@ -1,15 +1,12 @@
-from core.pesquisa import pesquisar_resumido
 from core.ai import bode_responder
 from core.stt import capturar_voz
 from core.config_audio import ConfigAudio
-# from core.auth import FenixAuth # Remova o comentário se for usar autenticação
+from core.system import obter_processos_pesados, saude_hardware, limpar_temporarios, encerrar_processo
 import sys, os, asyncio
 from colorama import Fore, Style, init
 import speech_recognition as sr
 import edge_tts
 import pygame
-import pyautogui 
-import threading
 
 init(autoreset=True)
 pygame.mixer.init()
@@ -32,11 +29,11 @@ def falar(texto):
     asyncio.run(falar_async(texto))
 
 class FenixBrain:
-    def __init__(self, interface=None, nome_usuario="Senhor"):
-        self.nome_ia = "Fênix"
+    def __init__(self, interface=None, nome_usuario="Fenix"):
+        self.nome_ia = "Feni"
         self.nome_projeto = "FENIX"
         self.nome_usuario = nome_usuario
-        self.interface = interface # Conexão com a UI
+        self.interface = interface 
         self.cfg = ConfigAudio()
         self.reconhecedor = sr.Recognizer()
         self.reconhecedor = self.cfg.configurar_reconhecedor(self.reconhecedor)
@@ -46,14 +43,38 @@ class FenixBrain:
         if self.interface:
             self.interface.log_msg(mensagem)
 
+    def executar_diagnostico(self):
+        """Fluxo direto: Pergunta e executa o que o senhor leu na interface"""
+        self.log("Aguardando instrução de diagnóstico...", Fore.YELLOW)
+        falar("O que o senhor deseja verificar no sistema?") # Pergunta curta e direta
+        
+        escolha = capturar_voz(self.reconhecedor, timeout=7).lower()
+        
+        if "processos" in escolha or "memória" in escolha:
+            falar("Analisando processos.")
+            falar(obter_processos_pesados())
+            
+        elif "saúde" in escolha or "hardware" in escolha:
+            falar(saude_hardware())
+            
+        elif "limpeza" in escolha or "temporários" in escolha:
+            falar("Iniciando limpeza.")
+            falar(limpar_temporarios())
+            
+        elif "rede" in escolha or "conexão" in escolha:
+            from core.system import analisar_conexoes
+            falar(analisar_conexoes())
+            
+        else:
+            falar("Entendido. Voltando para escuta passiva.")
+
     def start(self):
-        # Calibragem
         self.log("Calibrando sensores acústicos...", Fore.YELLOW)
         with sr.Microphone() as source:
             self.reconhecedor.adjust_for_ambient_noise(source, duration=2)
 
         self.log(f"Núcleo {self.nome_projeto} online.", Fore.RED)
-        falar(f"Núcleo {self.nome_projeto} online. Bem-vindo, {self.nome_usuario}.")
+        falar(f"Sistema {self.nome_projeto} ativo. Às suas ordens, Senhor {self.nome_usuario}.")
 
         while True:
             if self.interface: self.interface.mudar_status("STANDBY", "#005555")
@@ -62,7 +83,7 @@ class FenixBrain:
             
             if ativacao and any(word.lower() in ativacao.lower() for word in self.cfg.WAKE_WORDS):
                 if self.interface: self.interface.mudar_status("OUVINDO", "#00fbff")
-                falar(f"Sim {self.nome_usuario}.")
+                falar(f"Sim Senhor.")
                 
                 while True:
                     comando = capturar_voz(self.reconhecedor, timeout=8, phrase_limit=10)
@@ -71,21 +92,20 @@ class FenixBrain:
                     comando = comando.lower().strip()
                     self.log(f"[OUVIDO]: {comando}", Fore.BLUE)
 
+                    # --- INTERCEPTOR DE COMANDOS DE SISTEMA (Ação Direta) ---
                     if any(cmd in comando for cmd in self.cfg.CMD_DESLIGAR):
-                        falar("Desligando sistemas.")
+                        falar("Desativando núcleo neural. Até logo, Senhor.")
                         sys.exit()
 
                     elif any(cmd in comando for cmd in self.cfg.CMD_DESATIVAR_VOZ):
-                        falar("Em standby.")
+                        falar("Entrando em modo de espera.")
                         break
 
-                    elif "pesquisar" in comando:
-                        termo = comando.replace("pesquisar", "").strip()
-                        falar(f"Pesquisando {termo}")
-                        res = pesquisar_resumido(termo)
-                        falar(res['resumo'])
-                    
+                    elif "verificar computador" in comando:
+                        self.executar_diagnostico()
+
+                    # --- NÚCLEO DE INTELIGÊNCIA ARTIFICIAL ---
                     else:
                         resposta = bode_responder(comando)
-                        falar(resposta)
                         self.log(f"Fênix: {resposta}", Fore.GREEN)
+                        falar(resposta)

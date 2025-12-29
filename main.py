@@ -10,7 +10,7 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 def rodar_sistema(interface):
     """Função que rodará o cérebro em uma thread separada"""
-    fenix = FenixBrain(interface=interface, nome_usuario="Senhor")
+    fenix = FenixBrain(interface=interface, nome_usuario="Airton")
     try:
         fenix.start()
     except Exception as e:
